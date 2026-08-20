@@ -17,6 +17,9 @@ jobs:
       - name: Check out tagged source
         uses: actions/checkout@v7
 
+      - name: Test source and renderer
+        run: python3 -m unittest discover -s tests -v
+
       - name: Render standalone page
         run: |
           python3 render.py \

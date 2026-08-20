@@ -4,7 +4,7 @@ An interactive, historical taxonomy of methods used in LiDAR localization and po
 
 - `taxonomy.fragment.html` is the source of truth. It contains the taxonomy data, styles, and the `renderTaxonomy()` function.
 - `render.py` wraps that source in a complete standalone HTML document.
-- `index.html` is the generated, shareable page and can be opened locally or hosted as a static website.
+- `index.html` is an ignored local preview. Tagged releases generate and attach `lidar-localization-taxonomy.html` without committing it.
 
 ## Add or update a method
 
@@ -32,4 +32,18 @@ You can also choose explicit paths:
 python3 render.py taxonomy.fragment.html index.html
 ```
 
-The renderer uses only the Python standard library. Commit both the edited source and regenerated `index.html` so GitHub Pages or any other static host can serve the result directly.
+## Test
+
+Run the dependency-free test suite with:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The tests validate the standalone renderer, command-line output, category controls, method record schema, paper URLs, and the explicit allowlist of classical primitives without paper links.
+
+## Release
+
+Push a version tag such as `v0.1.0`. GitHub Actions tests the tagged source, renders `lidar-localization-taxonomy.html`, and attaches it to the corresponding GitHub Release.
+
+Generated HTML is ignored and should not be committed.
