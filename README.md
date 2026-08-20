@@ -1,5 +1,7 @@
 # LiDAR Localization Taxonomy
 
+[**Open the latest interactive taxonomy →**](https://quantum-pie.github.io/lidar-localization-taxonomy/)
+
 An interactive, historical taxonomy of methods used in LiDAR localization and point-cloud registration. Each paper-backed method links directly to its arXiv page.
 
 - `taxonomy.fragment.html` is the source of truth. It contains the taxonomy data, styles, and the `renderTaxonomy()` function.
@@ -44,6 +46,8 @@ The tests validate the standalone renderer, command-line output, category contro
 
 ## Release
 
-Push a version tag such as `v0.1.0`. GitHub Actions tests the tagged source, renders `lidar-localization-taxonomy.html`, and attaches it to the corresponding GitHub Release.
+Push a version tag such as `v0.1.0`. GitHub Actions tests the tagged source, attaches `lidar-localization-taxonomy.html` to the corresponding GitHub Release, and deploys the same page to GitHub Pages.
+
+Before the first release, select **GitHub Actions** under **Settings → Pages → Build and deployment → Source**.
 
 Generated HTML is ignored and should not be committed.
