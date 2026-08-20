@@ -5,13 +5,17 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   release:
-    name: Render and publish
+    name: Test, render, and release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
 
     steps:
       - name: Check out tagged source
@@ -20,12 +24,23 @@ jobs:
       - name: Test source and renderer
         run: python3 -m unittest discover -s tests -v
 
-      - name: Render standalone page
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Render release and Pages files
         run: |
+          mkdir -p _site
           python3 render.py \
             taxonomy.fragment.html \
-            lidar-localization-taxonomy.html
+            _site/index.html
+          cp _site/index.html lidar-localization-taxonomy.html
+          test -s _site/index.html
           test -s lidar-localization-taxonomy.html
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
 
       - name: Create GitHub Release
         env:
@@ -35,3 +50,20 @@ jobs:
             'lidar-localization-taxonomy.html#Standalone interactive taxonomy' \
             --verify-tag \
             --generate-notes
+
+  deploy:
+    name: Publish latest release to Pages
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
