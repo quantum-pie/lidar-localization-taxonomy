@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+/index.html
+/lidar-localization-taxonomy.html

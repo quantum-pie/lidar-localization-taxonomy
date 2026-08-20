@@ -1,0 +1,380 @@
+<!--
+  Canonical editable source.
+
+  To add a paper, append one object to the appropriate `methods` array:
+  {
+    year: '2027',
+    name: 'Method name',
+    note: 'One-sentence contribution.',
+    type: 'learned',
+    paper: 'https://arxiv.org/abs/...'
+  }
+
+  Valid types: handcrafted, learned, geometric, integrated.
+  Then run render.py to regenerate the shareable single-file page.
+-->
+<div id="pcr-literature-taxonomy">
+  <style>
+    #pcr-literature-taxonomy { width: 100%; }
+    #pcr-literature-taxonomy * { box-sizing: border-box; }
+    #pcr-literature-taxonomy .category-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    #pcr-literature-taxonomy .contract {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 0.75rem 0 1.25rem;
+    }
+    #pcr-literature-taxonomy .contract > div {
+      border-left: 2px solid var(--border);
+      padding-left: 0.75rem;
+    }
+    #pcr-literature-taxonomy .contract-label {
+      color: var(--muted-foreground);
+      display: block;
+      margin-bottom: 0.125rem;
+    }
+    #pcr-literature-taxonomy .contract-value { font-weight: 500; }
+    #pcr-literature-taxonomy .era {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 7rem minmax(0, 1fr);
+      padding: 0.85rem 0;
+    }
+    #pcr-literature-taxonomy .era + .era { border-top: 1px solid var(--border); }
+    #pcr-literature-taxonomy .era-label {
+      color: var(--muted-foreground);
+      font-weight: 500;
+    }
+    #pcr-literature-taxonomy .methods {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    }
+    #pcr-literature-taxonomy .method {
+      border-left: 3px solid var(--border);
+      min-height: 4rem;
+      padding-left: 0.65rem;
+    }
+    #pcr-literature-taxonomy .method.handcrafted { border-left-color: var(--viz-series-4); }
+    #pcr-literature-taxonomy .method.learned { border-left-color: var(--viz-series-1); }
+    #pcr-literature-taxonomy .method.geometric { border-left-color: var(--viz-series-2); }
+    #pcr-literature-taxonomy .method.integrated { border-left-color: var(--viz-series-3); }
+    #pcr-literature-taxonomy .method-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    #pcr-literature-taxonomy .method-year {
+      color: var(--muted-foreground);
+      font-variant-numeric: tabular-nums;
+    }
+    #pcr-literature-taxonomy .method-name { font-weight: 500; }
+    #pcr-literature-taxonomy .method-name-link {
+      color: var(--foreground);
+      text-decoration-color: var(--border);
+      text-underline-offset: 0.18em;
+    }
+    #pcr-literature-taxonomy .method-name-link:hover {
+      color: var(--primary);
+      text-decoration-color: currentColor;
+    }
+    #pcr-literature-taxonomy .method-note {
+      color: var(--muted-foreground);
+      margin-top: 0.15rem;
+    }
+    #pcr-literature-taxonomy .legend {
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      margin-top: 0.5rem;
+      padding-top: 0.75rem;
+    }
+    #pcr-literature-taxonomy .legend-item {
+      align-items: center;
+      display: inline-flex;
+      gap: 0.35rem;
+    }
+    #pcr-literature-taxonomy .swatch { height: 3px; width: 1.25rem; }
+    @media (max-width: 520px) {
+      #pcr-literature-taxonomy .contract { grid-template-columns: 1fr; }
+      #pcr-literature-taxonomy .era { grid-template-columns: 1fr; gap: 0.5rem; }
+      #pcr-literature-taxonomy .methods { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <h3>LiDAR Localization Taxonomy</h3>
+  <div class="category-controls viz-controls" role="group" aria-label="Literature categories">
+    <button class="btn btn-primary" type="button" data-category="retrieval" aria-pressed="true">Place retrieval</button>
+    <button class="btn" type="button" data-category="features" aria-pressed="false">Local features</button>
+    <button class="btn" type="button" data-category="matching" aria-pressed="false">Correspondence matching</button>
+    <button class="btn" type="button" data-category="estimation" aria-pressed="false">Robust estimation</button>
+    <button class="btn" type="button" data-category="global" aria-pressed="false">Global alignment</button>
+    <button class="btn" type="button" data-category="refinement" aria-pressed="false">Local refinement</button>
+    <button class="btn" type="button" data-category="odometry" aria-pressed="false">Sequential odometry</button>
+    <button class="btn" type="button" data-category="integrated" aria-pressed="false">Integrated registration</button>
+  </div>
+
+  <div class="contract" aria-live="polite">
+    <div><span class="contract-label text-small">Input</span><span class="contract-value" id="pcr-input"></span></div>
+    <div><span class="contract-label text-small">Output</span><span class="contract-value" id="pcr-output"></span></div>
+  </div>
+
+  <div id="pcr-eras"></div>
+
+  <div class="legend text-small" aria-label="Method family legend">
+    <span class="legend-item"><span class="swatch" style="background:var(--viz-series-4)"></span>handcrafted</span>
+    <span class="legend-item"><span class="swatch" style="background:var(--viz-series-1)"></span>learned component</span>
+    <span class="legend-item"><span class="swatch" style="background:var(--viz-series-2)"></span>geometric estimator or optimizer</span>
+    <span class="legend-item"><span class="swatch" style="background:var(--viz-series-3)"></span>integrated system</span>
+    <span class="legend-item">↗ paper link (arXiv when available)</span>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('pcr-literature-taxonomy');
+      const taxonomy = {
+        retrieval: {
+          input: 'One query scan and a database of scans or submaps',
+          output: 'A ranked shortlist of candidate places; no full 6-DoF pose',
+          eras: [
+            { label: 'Classical origin', methods: [
+              { year: '2008', name: 'FAB-MAP / BoW', note: 'Probabilistic bag-of-words place recognition; originally visual.', type: 'handcrafted', paper: 'https://doi.org/10.1177/0278364908090961' },
+              { year: '2010', name: 'VLAD', note: 'Aggregate local-descriptor residuals into one global vector.', type: 'handcrafted', paper: 'https://doi.org/10.1109/CVPR.2010.5540039' },
+              { year: '2016', name: 'M2DP', note: 'Describe a 3D scan through multiple 2D projections.', type: 'handcrafted', paper: 'https://doi.org/10.1109/IROS.2016.7759440' },
+              { year: '2018', name: 'Scan Context', note: 'Polar, yaw-aware whole-scan descriptor for outdoor LiDAR.', type: 'handcrafted', paper: 'https://gisbi-kim.github.io/publications/gkim-2018-iros.pdf' }
+            ]},
+            { label: 'Learned global descriptors', methods: [
+              { year: '2018', name: 'PointNetVLAD', note: 'PointNet representation with learned NetVLAD pooling.', type: 'learned', paper: 'https://arxiv.org/abs/1804.03492' },
+              { year: '2019', name: 'LPD-Net', note: 'Graph-based local feature aggregation into a large-scale place descriptor.', type: 'learned', paper: 'https://arxiv.org/abs/1812.07050' },
+              { year: '2020', name: 'OverlapNet', note: 'Pairwise range-image network predicting scan overlap and relative yaw.', type: 'learned', paper: 'https://arxiv.org/abs/2105.11344' },
+              { year: '2021', name: 'MinkLoc3D', note: 'Sparse-convolutional global place descriptor.', type: 'learned', paper: 'https://arxiv.org/abs/2011.04530' },
+              { year: '2022', name: 'LoGG3D-Net', note: 'Local-to-global learned descriptor for LiDAR place recognition.', type: 'learned', paper: 'https://arxiv.org/abs/2109.08336' },
+              { year: '2022', name: 'OverlapTransformer', note: 'Fast yaw-invariant transformer descriptor built from LiDAR range images.', type: 'learned', paper: 'https://arxiv.org/abs/2203.03397' }
+            ]}
+          ]
+        },
+        features: {
+          input: 'A single point cloud, voxel grid, or range image',
+          output: 'Keypoints or dense points with local descriptors and sometimes saliency scores',
+          eras: [
+            { label: 'Handcrafted', methods: [
+              { year: '1997', name: 'Spin Images', note: 'Histogram of local surface geometry around an oriented point.', type: 'handcrafted', paper: 'https://doi.org/10.1109/34.598228' },
+              { year: '2008–09', name: 'PFH / FPFH', note: 'Pose-invariant normal-angle histograms; FPFH reduces cost.', type: 'handcrafted', paper: 'https://doi.org/10.1109/ROBOT.2009.5152473' },
+              { year: '2010', name: 'SHOT', note: 'Local reference frame with spatially organized histograms.', type: 'handcrafted', paper: 'https://doi.org/10.1007/978-3-642-15558-1_23' }
+            ]},
+            { label: 'Learned descriptors', methods: [
+              { year: '2017', name: '3DMatch', note: 'Learned volumetric patch descriptor.', type: 'learned', paper: 'https://arxiv.org/abs/1603.08182' },
+              { year: '2018', name: '3DFeat-Net', note: 'Weakly supervised detector and descriptor for point clouds.', type: 'learned', paper: 'https://arxiv.org/abs/1807.09413' },
+              { year: '2019', name: 'FCGF', note: 'Dense fully convolutional geometric features.', type: 'learned', paper: 'https://openaccess.thecvf.com/content_ICCV_2019/papers/Choy_Fully_Convolutional_Geometric_Features_ICCV_2019_paper.pdf' },
+              { year: '2019', name: '3DSmoothNet', note: 'Compact rotation-invariant descriptor from voxelized smoothed densities.', type: 'learned', paper: 'https://arxiv.org/abs/1811.06879' },
+              { year: '2020', name: 'D3Feat', note: 'Joint dense keypoint detection and description.', type: 'learned', paper: 'https://arxiv.org/abs/2003.03164' },
+              { year: '2021', name: '3D3L', note: 'R2D2-inspired detection and description on LiDAR range images.', type: 'learned', paper: 'https://arxiv.org/abs/2103.13808' },
+              { year: '2021', name: 'SpinNet', note: 'Rotation-invariant local surface descriptor using cylindrical representation.', type: 'learned', paper: 'https://arxiv.org/abs/2011.12149' },
+              { year: '2024', name: 'PARE-Net', note: 'Position-aware rotation-equivariant local representation.', type: 'learned', paper: 'https://arxiv.org/abs/2407.10142' }
+            ]}
+          ]
+        },
+        matching: {
+          input: 'Two images, or two sets of descriptors, points, patches, or superpoints',
+          output: 'Hard or soft tentative correspondences; usually still contains outliers',
+          eras: [
+            { label: 'Classical association', methods: [
+              { year: '—', name: 'Nearest neighbour', note: 'Choose the closest descriptor independently.', type: 'handcrafted' },
+              { year: '2004', name: 'Ratio test', note: 'Reject descriptors whose first and second choices are ambiguous.', type: 'handcrafted', paper: 'https://www.cs.ubc.ca/~lowe/papers/ijcv04.pdf' },
+              { year: '—', name: 'Mutual check', note: 'Retain only reciprocal nearest-neighbour assignments.', type: 'handcrafted' }
+            ]},
+            { label: 'Generic image-feature matchers', methods: [
+              { year: '2020', name: 'SuperGlue', note: 'Matches sparse 2D image features using self/cross attention and differentiable optimal-transport assignment.', type: 'learned', paper: 'https://arxiv.org/abs/1911.11763' },
+              { year: '2021', name: 'LoFTR', note: 'Detector-free coarse-to-fine 2D image matching with self and cross attention.', type: 'learned', paper: 'https://arxiv.org/abs/2104.00680' },
+              { year: '2023', name: 'LightGlue', note: 'Efficient SuperGlue successor for sparse 2D image features; adapts depth and prunes points according to pair difficulty.', type: 'learned', paper: 'https://arxiv.org/abs/2306.13643' }
+            ]},
+            { label: 'Point-cloud-native pair-conditioned matching', methods: [
+              { year: '2021', name: 'PREDATOR', note: 'Conditions features and sampling on the predicted overlap region.', type: 'integrated', paper: 'https://arxiv.org/abs/2011.13005' },
+              { year: '2021', name: 'CoFiNet', note: 'Matches coarse nodes before refining point correspondences in patches.', type: 'integrated', paper: 'https://arxiv.org/abs/2110.14076' },
+              { year: '2022', name: 'GeoTransformer', note: 'Uses pairwise distances and triplet angles for superpoint context.', type: 'integrated', paper: 'https://arxiv.org/abs/2308.03768' },
+              { year: '2022', name: 'REGTR', note: 'Directly predicts overlap and cross-cloud point correspondences with transformers.', type: 'integrated', paper: 'https://arxiv.org/abs/2203.14517' },
+              { year: '2023', name: 'PEAL', note: 'Uses overlap priors to focus explicit cross-cloud attention.', type: 'integrated', paper: 'https://openreview.net/pdf?id=rAUrG0pyc0' },
+              { year: '2023', name: 'RoITr', note: 'Rotation-invariant local and global attention using point-pair geometry.', type: 'learned', paper: 'https://arxiv.org/abs/2303.08231' },
+              { year: '2026', name: 'UniCorrn', note: 'Unified query-based correspondence transformer across 2D and 3D.', type: 'learned', paper: 'https://arxiv.org/abs/2605.04044' },
+              { year: '2026', name: 'SuP', note: 'Finds high-overlap sub-cloud pairs before fine matching.', type: 'integrated', paper: 'https://openaccess.thecvf.com/content/CVPR2026/html/Fung_SuP_Sub-cloud_Driven_Point_Cloud_Registration_CVPR_2026_paper.html' }
+            ]}
+          ]
+        },
+        estimation: {
+          input: 'Tentative 3D correspondences, often with a very high outlier fraction',
+          output: 'One or more rigid SE(3) transformation hypotheses',
+          eras: [
+            { label: 'Classical origin', methods: [
+              { year: '1976–87', name: 'Kabsch / Arun SVD', note: 'Closed-form least-squares rigid pose when correspondences are correct.', type: 'geometric', paper: 'https://doi.org/10.1109/TPAMI.1987.4767965' },
+              { year: '1981', name: 'RANSAC', note: 'Sample minimal sets, score consensus, and keep the best hypothesis.', type: 'handcrafted', paper: 'https://doi.org/10.1145/358669.358692' },
+              { year: '2016', name: 'FGR', note: 'Graduated robust optimization over tentative correspondences.', type: 'geometric', paper: 'https://vladlen.info/publications/fast-global-registration/' },
+              { year: '2020', name: 'TEASER++', note: 'Certifiable robust estimation under extreme correspondence outliers.', type: 'geometric', paper: 'https://arxiv.org/abs/2001.07715' }
+            ]},
+            { label: 'Learned filtering', methods: [
+              { year: '2020', name: 'DGR', note: 'Learns inlier likelihoods before robust pose recovery.', type: 'learned', paper: 'https://arxiv.org/abs/2004.11540' },
+              { year: '2021', name: 'PointDSC', note: 'Learns correspondence confidence from deep spatial consistency.', type: 'learned', paper: 'https://arxiv.org/abs/2103.05465' }
+            ]},
+            { label: 'Compatibility graphs', methods: [
+              { year: '2022', name: 'SC²-PCR', note: 'Second-order compatibility, seed selection, consensus expansion, SVD.', type: 'geometric', paper: 'https://arxiv.org/abs/2203.14453' },
+              { year: '2023', name: 'MAC', note: 'Generates transformation hypotheses from maximal cliques.', type: 'geometric', paper: 'https://arxiv.org/abs/2305.10854' },
+              { year: '2025', name: 'TurboReg', note: 'Fast constrained three-clique hypothesis search.', type: 'geometric', paper: 'https://arxiv.org/abs/2507.01439' },
+              { year: '2026', name: 'MHopReg', note: 'Equivariant scoring plus hierarchical graph expansion and ranking.', type: 'learned', paper: 'https://openaccess.thecvf.com/content/CVPR2026/html/Wu_MHopReg_Efficient_Hierarchical_Multi-Hop_Graph_Search_for_Point_Cloud_Registration_CVPR_2026_paper.html' },
+              { year: '2026', name: 'DualReg', note: 'Dual-space correspondence filtering and hypothesis reinforcement.', type: 'geometric', paper: 'https://arxiv.org/abs/2508.17034' }
+            ]}
+          ]
+        },
+        global: {
+          input: 'Two point clouds with arbitrary or very poor relative initialization',
+          output: 'A coarse rigid pose intended to enter a local refinement basin',
+          eras: [
+            { label: 'Congruent-set search', methods: [
+              { year: '2008', name: '4PCS', note: 'Finds congruent coplanar four-point bases without requiring initial alignment.', type: 'geometric', paper: 'https://research.google/pubs/4-points-congruent-sets-for-robust-pairwise-surface-registration/' },
+              { year: '2014', name: 'Super4PCS', note: 'Accelerates 4PCS with smart indexing and linear-time behavior in the number of points.', type: 'geometric', paper: 'https://doi.org/10.1111/cgf.12446' }
+            ]},
+            { label: 'Globally optimal search', methods: [
+              { year: '2013', name: 'Go-ICP', note: 'Branch-and-bound search over SE(3), accelerated by local ICP, with a global-optimality guarantee.', type: 'geometric', paper: 'https://arxiv.org/abs/1605.03344' }
+            ]}
+          ]
+        },
+        refinement: {
+          input: 'Two clouds plus an initial pose inside the optimizer’s convergence basin',
+          output: 'A locally refined rigid pose',
+          eras: [
+            { label: 'Classical local registration', methods: [
+              { year: '1992', name: 'Point-to-point ICP', note: 'Alternate closest-point association and least-squares pose updates.', type: 'geometric', paper: 'https://doi.org/10.1109/34.121791' },
+              { year: '1992', name: 'Point-to-plane ICP', note: 'Minimize residuals along target surface normals.', type: 'geometric', paper: 'https://doi.org/10.1016/0262-8856(92)90066-C' },
+              { year: '2003', name: 'NDT', note: 'Align a scan to Gaussian distributions stored in spatial cells.', type: 'geometric', paper: 'https://doi.org/10.1109/IROS.2003.1249285' },
+              { year: '2009', name: 'GICP', note: 'Probabilistic plane-to-plane generalization of ICP.', type: 'geometric', paper: 'https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf' },
+              { year: '2010', name: 'CPD', note: 'Probabilistic point-set alignment using Gaussian mixtures and expectation maximization.', type: 'geometric', paper: 'https://arxiv.org/abs/0905.2635' }
+            ]},
+            { label: 'Extended refinement systems', methods: [
+              { year: '2019', name: 'PointNetLK', note: 'Lucas–Kanade iterations in a learned PointNet feature space.', type: 'learned', paper: 'https://arxiv.org/abs/1903.05711' },
+              { year: '2023', name: 'KISS-ICP', note: 'A complete odometry system built around robust point-to-map point-to-point ICP, rather than a bare pairwise optimizer.', type: 'integrated', paper: 'https://arxiv.org/abs/2209.15397' },
+              { year: '2025', name: 'RARE', note: 'Zero-shot refinement using depth-projection diffusion features.', type: 'learned', paper: 'https://arxiv.org/abs/2507.19950' },
+              { year: '2026', name: 'Generalized-CVO', note: 'Correspondence-free RKHS alignment with second-order Riemannian optimization.', type: 'geometric', paper: 'https://arxiv.org/abs/2606.10019' }
+            ]}
+          ]
+        },
+        odometry: {
+          input: 'A time-ordered LiDAR scan stream, usually with a rolling local map and motion prior',
+          output: 'Frame-to-frame or scan-to-map poses forming a continuous local trajectory',
+          eras: [
+            { label: 'Geometric foundations', methods: [
+              { year: '1992', name: 'ICP scan matching', note: 'Repeatedly align each new scan to a previous scan or accumulated map.', type: 'geometric', paper: 'https://doi.org/10.1109/34.121791' },
+              { year: '2003', name: 'NDT scan matching', note: 'Register scans against Gaussian map cells.', type: 'geometric', paper: 'https://doi.org/10.1109/IROS.2003.1249285' },
+              { year: '2014', name: 'LOAM', note: 'Separate high-rate edge/plane odometry from lower-rate mapping refinement.', type: 'integrated', paper: 'https://publications.ri.cmu.edu/loam-lidar-odometry-and-mapping-in-real-time' },
+              { year: '2018', name: 'SuMa', note: 'Surfel-based LiDAR odometry and mapping.', type: 'integrated', paper: 'https://jbehley.github.io/papers/behley2018rss.pdf' }
+            ]},
+            { label: 'Modern classical odometry', methods: [
+              { year: '2022', name: 'CT-ICP', note: 'Continuous-time scan-to-map ICP for motion-distorted LiDAR scans.', type: 'integrated', paper: 'https://arxiv.org/abs/2109.12979' },
+              { year: '2023', name: 'KISS-ICP', note: 'Point-to-point ICP with adaptive correspondence thresholds, robust weighting, motion compensation, subsampling, and a voxel map.', type: 'integrated', paper: 'https://arxiv.org/abs/2209.15397' }
+            ]},
+            { label: 'Learned odometry', methods: [
+              { year: '2019', name: 'LO-Net', note: 'Learning-based sequential LiDAR odometry with geometric consistency.', type: 'learned', paper: 'https://arxiv.org/abs/1904.08242' },
+              { year: '2021', name: 'PWCLO-Net', note: 'Hierarchical embedding and cost volumes for LiDAR odometry.', type: 'learned', paper: 'https://arxiv.org/abs/2012.00972' },
+              { year: '2023', name: 'RegFormer', note: 'Projection-aware transformer for large-scale LiDAR registration and odometry.', type: 'integrated', paper: 'https://arxiv.org/abs/2303.12384' },
+              { year: '2026', name: 'RegFormer++', note: 'End-to-end outdoor LiDAR association and coarse-to-fine pose refinement.', type: 'integrated', paper: 'https://arxiv.org/abs/2603.14290' }
+            ]}
+          ]
+        },
+        integrated: {
+          input: 'A pair of raw or downsampled point clouds',
+          output: 'A rigid pose, with feature extraction, matching, and estimation coupled internally',
+          eras: [
+            { label: 'Modular ancestor', methods: [
+              { year: '2009+', name: 'FPFH + sample consensus + ICP', note: 'Handcrafted features, robust global initialization, then local refinement.', type: 'integrated' }
+            ]},
+            { label: 'Early learned registration', methods: [
+              { year: '2019', name: 'DCP', note: 'Learns pair-conditioned point features and correspondences, then solves pose with differentiable SVD.', type: 'integrated', paper: 'https://arxiv.org/abs/1905.03304' },
+              { year: '2020', name: 'RPM-Net', note: 'Iteratively predicts soft correspondences using learned features, Sinkhorn assignment, and annealing.', type: 'integrated', paper: 'https://arxiv.org/abs/2003.13479' },
+              { year: '2022', name: 'REGTR', note: 'Predicts final correspondences and overlap directly, enabling pose recovery without RANSAC.', type: 'integrated', paper: 'https://arxiv.org/abs/2203.14517' }
+            ]},
+            { label: 'Coarse-to-fine registration', methods: [
+              { year: '2021', name: 'PREDATOR', note: 'Overlap-aware feature sampling followed by robust registration.', type: 'integrated', paper: 'https://arxiv.org/abs/2011.13005' },
+              { year: '2021', name: 'CoFiNet', note: 'Detector-free coarse node matching followed by fine point matching.', type: 'integrated', paper: 'https://arxiv.org/abs/2110.14076' },
+              { year: '2022', name: 'GeoTransformer', note: 'Geometric superpoint context, dense patch matching, local-to-global pose.', type: 'integrated', paper: 'https://arxiv.org/abs/2308.03768' },
+              { year: '2023', name: 'BUFFER', note: 'Balances learned local features, patch association, RANSAC, and efficiency.', type: 'integrated', paper: 'https://openaccess.thecvf.com/content/CVPR2023/papers/Ao_BUFFER_Balancing_Accuracy_Efficiency_and_Generalizability_in_Point_Cloud_Registration_CVPR_2023_paper.pdf' },
+              { year: '2024', name: 'PARE-Net', note: 'Equivariant representation and feature-guided pose hypotheses.', type: 'integrated', paper: 'https://arxiv.org/abs/2407.10142' }
+            ]},
+            { label: 'Direct large-scale LiDAR', methods: [
+              { year: '2023', name: 'RegFormer', note: 'Projection-aware transformer directly estimates and refines outdoor LiDAR pose.', type: 'integrated', paper: 'https://arxiv.org/abs/2303.12384' },
+              { year: '2026', name: 'RegFormer++', note: 'Hierarchical range-projection transformer with association and learned pose refinement.', type: 'integrated', paper: 'https://arxiv.org/abs/2603.14290' }
+            ]}
+          ]
+        }
+      };
+
+
+      const input = root.querySelector('#pcr-input');
+      const output = root.querySelector('#pcr-output');
+      const eras = root.querySelector('#pcr-eras');
+
+      function renderTaxonomy(categoryKey = 'retrieval') {
+        const category = taxonomy[categoryKey];
+        input.textContent = category.input;
+        output.textContent = category.output;
+        eras.replaceChildren();
+        category.eras.forEach((era) => {
+          const section = document.createElement('section');
+          section.className = 'era';
+          const label = document.createElement('div');
+          label.className = 'era-label';
+          label.textContent = era.label;
+          const methods = document.createElement('div');
+          methods.className = 'methods';
+          era.methods.forEach((method) => {
+            const item = document.createElement('div');
+            item.className = `method ${method.type}`;
+            const line = document.createElement('div');
+            line.className = 'method-line';
+            const year = document.createElement('span');
+            year.className = 'method-year';
+            year.textContent = method.year;
+            const paperUrl = method.paper;
+            const name = document.createElement(paperUrl ? 'a' : 'span');
+            name.className = paperUrl ? 'method-name method-name-link' : 'method-name';
+            name.textContent = paperUrl ? `${method.name} ↗` : method.name;
+            if (paperUrl) {
+              name.href = paperUrl;
+              name.target = '_blank';
+              name.rel = 'noopener noreferrer';
+              name.setAttribute('aria-label', `Open the ${method.name} paper`);
+            }
+            const note = document.createElement('div');
+            note.className = 'method-note text-small';
+            note.textContent = method.note;
+            line.append(year, name);
+            item.append(line, note);
+            methods.append(item);
+          });
+          section.append(label, methods);
+          eras.append(section);
+        });
+      }
+
+      root.querySelectorAll('[data-category]').forEach((button) => {
+        button.addEventListener('click', () => {
+          root.querySelectorAll('[data-category]').forEach((candidate) => {
+            const selected = candidate === button;
+            candidate.setAttribute('aria-pressed', String(selected));
+            candidate.classList.toggle('btn-primary', selected);
+          });
+          renderTaxonomy(button.dataset.category);
+        });
+      });
+
+      window.lidarRegistrationTaxonomy = {
+        data: taxonomy,
+        render: renderTaxonomy
+      };
+
+      renderTaxonomy();
+    })();
+  </script>
+</div>
